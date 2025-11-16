@@ -8,6 +8,15 @@ from PIL import Image
 from io import BytesIO
 import re
 
+# ====== THƯ VIỆN ĐỌC QR CODE ======
+try:
+    from pyzbar.pyzbar import decode
+    import cv2
+    import numpy as np
+    QR_READER_AVAILABLE = True
+except ImportError:
+    QR_READER_AVAILABLE = False
+
 # ====== MẬT KHẨU MẶC ĐỊNH CHO CÔNG AN ======
 DEFAULT_PASSWORD = "CA@123123"
 
@@ -218,6 +227,11 @@ with tab1:
             with col_success2:
                 st.success("🎉 TẠO MÃ QR THÀNH CÔNG!")
                 
+                # Hiển thị dữ liệu QR để copy (QUAN TRỌNG)
+                st.markdown("### 📋 DỮ LIỆU QR ĐỂ SAO CHÉP:")
+                st.code(combo_data, language="json")
+                st.info("💡 **SAO CHÉP ĐOẠN CODE TRÊN để dán vào phần giải mã**")
+                
                 if loai_doituong == "🚗 XE CÁ NHÂN HỌC SINH":
                     st.info(f"**Loại:** Xe cá nhân học sinh")
                     st.info(f"**Học sinh:** {hoten_hocsinh}")
@@ -239,12 +253,6 @@ with tab1:
                 st.success(f"**Mật khẩu tùy chỉnh:** {custom_password}")
                 st.info(f"**Ngày sinh để mở QR:** {ngaysinh_mo_qr}")
                 st.info("**Mật khẩu Công an:** Hệ thống")
-                
-                st.markdown("### 📝 HƯỚNG DẪN TRUY CẬP:")
-                st.markdown("**Có 3 cách để mở QR:**")
-                st.markdown("1. **Mật khẩu tùy chỉnh** (khuyến nghị)")
-                st.markdown("2. **Ngày sinh** (học sinh/chủ xe)")
-                st.markdown("3. **Mật khẩu Công an** (hệ thống)")
 
 # ---------- TAB 2: GIẢI MÃ THÔNG TIN ----------
 with tab2:
@@ -254,8 +262,10 @@ with tab2:
     uploaded = st.file_uploader("Chọn file ảnh", type=["png", "jpg", "jpeg"])
     
     st.markdown("---")
-    st.markdown("### 🔄 HOẶC NHẬP THỦ CÔNG DỮ LIỆU QR")
-    manual_qr_data = st.text_area("Dán dữ liệu từ mã QR vào đây", placeholder='{"cong_an": "encrypted_data", "ngay_sinh": "encrypted_data", "custom": "encrypted_data"}', height=100)
+    st.markdown("### 📋 HOẶC NHẬP DỮ LIỆU QR THỦ CÔNG")
+    manual_qr_data = st.text_area("Dán dữ liệu từ mã QR vào đây", 
+                                 placeholder='{"cong_an": "encrypted_data...", "ngay_sinh": "encrypted_data...", "custom": "encrypted_data..."}', 
+                                 height=150)
     
     st.markdown("---")
     st.markdown("### 🔑 CHỌN PHƯƠNG THỨC MỞ KHÓA")
@@ -314,26 +324,27 @@ with tab2:
                 image = Image.open(uploaded)
                 st.image(image, caption="Ảnh đã tải lên", width=300)
                 
-                try:
-                    from pyzbar.pyzbar import decode
-                    import cv2
-                    import numpy as np
-                    
-                    img_array = np.array(image)
-                    if len(img_array.shape) == 3:
-                        img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-                    else:
-                        img_cv = img_array
-                        
-                    qr_codes = decode(img_cv)
-                    if qr_codes:
-                        encrypted_combo = qr_codes[0].data.decode()
-                        st.success("✅ ĐÃ ĐỌC THÀNH CÔNG MÃ QR TỪ ẢNH!")
-                    else:
-                        st.warning("⚠️ KHÔNG THỂ ĐỌC MÃ QR TỰ ĐỘNG. Vui lòng nhập thủ công.")
+                if QR_READER_AVAILABLE:
+                    try:
+                        img_array = np.array(image)
+                        if len(img_array.shape) == 3:
+                            img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                        else:
+                            img_cv = img_array
+                            
+                        qr_codes = decode(img_cv)
+                        if qr_codes:
+                            encrypted_combo = qr_codes[0].data.decode()
+                            st.success("✅ ĐÃ ĐỌC THÀNH CÔNG MÃ QR TỪ ẢNH!")
+                        else:
+                            st.warning("⚠️ KHÔNG TÌM THẤY MÃ QR TRONG ẢNH. Vui lòng nhập thủ công dữ liệu QR.")
+                            st.stop()
+                    except Exception as e:
+                        st.error(f"❌ LỖI KHI ĐỌC MÃ QR: {str(e)}")
                         st.stop()
-                except ImportError:
-                    st.warning("⚠️ KHÔNG THỂ ĐỌC MÃ QR TỰ ĐỘNG. Vui lòng nhập thủ công dữ liệu QR ở trên.")
+                else:
+                    st.warning("⚠️ THƯ VIỆN ĐỌC QR CHƯA ĐƯỢC CÀI ĐẶT. Vui lòng nhập thủ công dữ liệu QR.")
+                    st.info("💡 Chạy lệnh: pip install pyzbar")
                     st.stop()
                     
             except Exception as e:
