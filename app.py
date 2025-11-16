@@ -7,9 +7,6 @@ import base64
 from PIL import Image
 from io import BytesIO
 import re
-import cv2
-import numpy as np
-from pyzbar.pyzbar import decode
 
 # ====== MẬT KHẨU MẶC ĐỊNH CHO CÔNG AN ======
 DEFAULT_PASSWORD = "CA@123123"
@@ -90,6 +87,36 @@ def try_birthdate_passwords(combo_json, birthdate_passwords):
                 continue
     return None, None
 
+# ====== Hàm đọc QR code thay thế ======
+def decode_qr_code(image):
+    """
+    Giải mã QR code từ ảnh sử dụng thư viện thuần Python
+    """
+    try:
+        # Thử dùng pyzbar nếu có
+        from pyzbar.pyzbar import decode as pyzbar_decode
+        import cv2
+        import numpy as np
+        
+        img_array = np.array(image)
+        if len(img_array.shape) == 3:
+            img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        else:
+            img_cv = img_array
+            
+        qr_codes = pyzbar_decode(img_cv)
+        if qr_codes:
+            return qr_codes[0].data.decode()
+    except ImportError:
+        # Fallback: Yêu cầu người dùng nhập thủ công dữ liệu QR
+        st.warning("⚠️ Không thể đọc QR code tự động. Vui lòng nhập thủ công dữ liệu từ QR code.")
+        return None
+    except Exception as e:
+        st.error(f"❌ Lỗi khi đọc QR code: {str(e)}")
+        return None
+    
+    return None
+
 # ====== Giao diện web ======
 st.set_page_config(page_title="Hệ Thống QR Code Quản Lý Học Sinh", page_icon="🎓", layout="wide")
 
@@ -106,23 +133,24 @@ with tab1:
     
     with col1:
         st.markdown("### Thông tin cá nhân")
-        hoten = st.text_input("Họ và tên học sinh")
-        ngaysinh = st.text_input("Ngày tháng năm sinh", placeholder="VD: 15/07/2008")
-        lop = st.text_input("Lớp")
-        truong = st.text_input("Trường")
+        hoten = st.text_input("Họ và tên học sinh *", placeholder="Nguyễn Văn A")
+        ngaysinh = st.text_input("Ngày tháng năm sinh *", placeholder="15/07/2008")
+        lop = st.text_input("Lớp", placeholder="10A1")
+        truong = st.text_input("Trường", placeholder="THPT ABC")
         
     with col2:
         st.markdown("### Thông tin liên hệ")
-        hoten_phuhuynh = st.text_input("Họ tên phụ huynh")
-        sdt_phuhuynh = st.text_input("Số điện thoại phụ huynh")
-        diachi = st.text_input("Địa chỉ")
-        bienso_xe = st.text_input("Biển số xe (nếu có)")
+        hoten_phuhuynh = st.text_input("Họ tên phụ huynh", placeholder="Nguyễn Văn B")
+        sdt_phuhuynh = st.text_input("Số điện thoại phụ huynh", placeholder="0912345678")
+        diachi = st.text_input("Địa chỉ", placeholder="123 Đường XYZ, Quận 1, TP.HCM")
+        bienso_xe = st.text_input("Biển số xe (nếu có)", placeholder="59-A1 123.45")
     
     # Mật khẩu riêng cho từng học sinh
     password = st.text_input("🔐 Mật khẩu bảo vệ (dùng cho công an)", type="password", 
+                           value="CA@123123",
                            help="Mật khẩu này chỉ công an biết, phụ huynh dùng ngày sinh để truy cập")
 
-    if st.button("🎯 TẠO MÃ QR CHO HỌC SINH"):
+    if st.button("🎯 TẠO MÃ QR CHO HỌC SINH", type="primary"):
         if not hoten or not ngaysinh:
             st.warning("⚠️ Vui lòng nhập ít nhất Họ tên và Ngày sinh của học sinh!")
         else:
@@ -136,7 +164,7 @@ with tab1:
                 "sdt_phuhuynh": sdt_phuhuynh,
                 "diachi": diachi,
                 "bienso_xe": bienso_xe,
-                "thoigian_taoma": st.session_state.get('current_time', '2025-01-01')
+                "thoigian_taoma": "2025-01-01 00:00:00"
             }
             
             # Loại bỏ các trường rỗng
@@ -195,19 +223,22 @@ with tab1:
                 3. **Dán decal** lên xe máy
                 4. Khi cần kiểm tra, **quét mã QR** bằng tab GIẢI MÃ
                 """)
+                
+                # Hiển thị dữ liệu mã hóa để backup
+                with st.expander("📋 XEM DỮ LIỆU MÃ HÓA (CHO SAO LƯU)"):
+                    st.text_area("Dữ liệu mã QR", combo_data, height=100)
 
 # ---------- TAB 2: GIẢI MÃ THÔNG TIN ----------
 with tab2:
     st.subheader("🔍 QUÉT MÃ QR ĐỂ TRA CỨU THÔNG TIN")
     
-    uploaded = st.file_uploader("📤 TẢI LÊN ẢNH CHỨA MÃ QR", type=["png", "jpg", "jpeg"])
+    st.markdown("### 📤 TẢI LÊN ẢNH CHỨA MÃ QR")
+    uploaded = st.file_uploader("Chọn file ảnh", type=["png", "jpg", "jpeg"])
     
-    if uploaded:
-        st.success("✅ ĐÃ TẢI LÊN ẢNH THÀNH CÔNG!")
-        
-        # Hiển thị ảnh preview
-        img = Image.open(uploaded)
-        st.image(img, caption="Ảnh mã QR đã tải lên", width=300)
+    # Phương án dự phòng: nhập thủ công dữ liệu QR
+    st.markdown("---")
+    st.markdown("### 🔄 HOẶC NHẬP THỦ CÔNG DỮ LIỆU QR")
+    manual_qr_data = st.text_area("Dán dữ liệu từ mã QR vào đây", placeholder='{"user": "encrypted_data", "default": "encrypted_data"}', height=100)
     
     st.markdown("---")
     st.markdown("### 👥 CHỌN PHƯƠNG THỨC TRUY CẬP")
@@ -234,21 +265,39 @@ with tab2:
         password_dec = st.text_input("🔒 NHẬP MẬT KHẨU RIÊNG", type="password")
 
     if st.button("🚀 GIẢI MÃ THÔNG TIN", type="primary"):
-        if not uploaded:
-            st.warning("⚠️ VUI LÒNG CHỌN ẢNH CHỨA MÃ QR!")
+        encrypted_combo = None
+        
+        # Ưu tiên dữ liệu nhập thủ công
+        if manual_qr_data and manual_qr_data.strip():
+            try:
+                encrypted_combo = manual_qr_data.strip()
+                st.success("✅ ĐÃ NHẬN DỮ LIỆU QR THỦ CÔNG")
+            except:
+                st.error("❌ DỮ LIỆU QR KHÔNG HỢP LỆ!")
+        
+        # Nếu không có dữ liệu thủ công, thử đọc từ ảnh
+        elif uploaded:
+            try:
+                image = Image.open(uploaded)
+                st.image(image, caption="Ảnh đã tải lên", width=300)
+                
+                encrypted_combo = decode_qr_code(image)
+                if encrypted_combo:
+                    st.success("✅ ĐÃ ĐỌC THÀNH CÔNG MÃ QR TỪ ẢNH!")
+                else:
+                    st.warning("⚠️ KHÔNG THỂ ĐỌC MÃ QR TỰ ĐỘNG. Vui lòng nhập thủ công dữ liệu QR ở trên.")
+                    st.stop()
+                    
+            except Exception as e:
+                st.error(f"❌ LỖI KHI XỬ LÝ ẢNH: {str(e)}")
+                st.stop()
+        else:
+            st.warning("⚠️ VUI LÒNG TẢI LÊN ẢNH HOẶC NHẬP DỮ LIỆU QR!")
             st.stop()
-            
-        try:
-            # Xử lý ảnh QR
-            img = Image.open(uploaded)
-            img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-            qr_codes = decode(img_cv)
 
-            if not qr_codes:
-                st.error("❌ KHÔNG PHÁT HIỆN ĐƯỢC MÃ QR TRONG ẢNH!")
-            else:
-                encrypted_combo = qr_codes[0].data.decode()
-
+        # Xử lý giải mã
+        if encrypted_combo:
+            try:
                 # Giải mã lớp JSON chứa 2 đoạn mã hóa
                 try:
                     combo_json = json.loads(encrypted_combo)
@@ -336,8 +385,8 @@ with tab2:
                 else:
                     st.error("❌ KHÔNG THỂ GIẢI MÃ! VUI LÒNG KIỂM TRA LẠI PHƯƠNG THỨC TRUY CẬP.")
                         
-        except Exception as e:
-            st.error(f"❌ CÓ LỖI XẢY RA KHI XỬ LÝ ẢNH QR: {str(e)}")
+            except Exception as e:
+                st.error(f"❌ LỖI KHI GIẢI MÃ: {str(e)}")
 
 # ====== FOOTER ======
 st.markdown("---")
