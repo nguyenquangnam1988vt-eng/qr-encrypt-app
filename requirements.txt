@@ -1,7 +1,8 @@
 streamlit
-qrcode
+qrcode[pil]
 cryptography
 pillow
 pyzbar
 opencv-python-headless
 numpy
+libgl1
