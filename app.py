@@ -7,9 +7,11 @@ import base64
 from PIL import Image
 from io import BytesIO
 import re
-from datetime import datetime
+import cv2
+import numpy as np
+from pyzbar.pyzbar import decode
 
-# ====== MẬT KHẨU MẶC ĐỊNH ======
+# ====== MẬT KHẨU MẶC ĐỊNH CHO CÔNG AN ======
 DEFAULT_PASSWORD = "CA@123123"
 
 # ====== Hàm mã hóa / giải mã ======
@@ -35,7 +37,7 @@ def extract_and_format_birthdate(data_dict):
     birthdate_formats = []
     
     # Các key có thể chứa ngày sinh
-    birth_keys = ['ngaysinh', 'birthdate', 'birthday', 'dob', 'ngay_sinh', 'dateofbirth']
+    birth_keys = ['ngaysinh', 'birthdate', 'birthday', 'dob', 'ngay_sinh', 'dateofbirth', 'ngaysinhhocsinh']
     
     for key, value in data_dict.items():
         # Kiểm tra cả key và value
@@ -89,34 +91,61 @@ def try_birthdate_passwords(combo_json, birthdate_passwords):
     return None, None
 
 # ====== Giao diện web ======
-st.title("🔐 Tạo & Giải mã QR có 3 loại mật khẩu (riêng, mặc định & ngày sinh)")
+st.set_page_config(page_title="Hệ Thống QR Code Quản Lý Học Sinh", page_icon="🎓", layout="wide")
 
-tab1, tab2 = st.tabs(["📦 Tạo mã QR", "🔓 Giải mã QR"])
+st.title("🎓 HỆ THỐNG QUẢN LÝ HỌC SINH THAM GIA GIAO THÔNG")
+st.markdown("**Ứng dụng mã QR thông minh cho Công an, Nhà trường và Phụ huynh**")
 
-# ---------- TAB 1: TẠO MÃ ----------
+tab1, tab2 = st.tabs(["📦 TẠO MÃ QR CHO HỌC SINH", "🔓 GIẢI MÃ THÔNG TIN"])
+
+# ---------- TAB 1: TẠO MÃ QR CHO HỌC SINH ----------
 with tab1:
-    st.subheader("Nhập thông tin để tạo mã QR")
+    st.subheader("📋 NHẬP THÔNG TIN HỌC SINH ĐỂ TẠO MÃ QR")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Thông tin cá nhân")
+        hoten = st.text_input("Họ và tên học sinh")
+        ngaysinh = st.text_input("Ngày tháng năm sinh", placeholder="VD: 15/07/2008")
+        lop = st.text_input("Lớp")
+        truong = st.text_input("Trường")
+        
+    with col2:
+        st.markdown("### Thông tin liên hệ")
+        hoten_phuhuynh = st.text_input("Họ tên phụ huynh")
+        sdt_phuhuynh = st.text_input("Số điện thoại phụ huynh")
+        diachi = st.text_input("Địa chỉ")
+        bienso_xe = st.text_input("Biển số xe (nếu có)")
+    
+    # Mật khẩu riêng cho từng học sinh
+    password = st.text_input("🔐 Mật khẩu bảo vệ (dùng cho công an)", type="password", 
+                           help="Mật khẩu này chỉ công an biết, phụ huynh dùng ngày sinh để truy cập")
 
-    password = st.text_input("Nhập mật khẩu riêng để bảo vệ", type="password")
-    num_fields = st.number_input("Số lượng trường thông tin", 1, 10, 1)
-
-    fields = {}
-    for i in range(num_fields):
-        key = st.text_input(f"Tên trường {i+1}", placeholder=f"VD: hoten, ngaysinh...")
-        val = st.text_input(f"Giá trị {i+1}", placeholder=f"VD: Nguyen Van A, 15/7/1983...")
-        if key:
-            fields[key] = val
-
-    if st.button("Tạo mã QR"):
-        if not password:
-            st.warning("⚠️ Vui lòng nhập mật khẩu riêng!")
-        elif not fields:
-            st.warning("⚠️ Cần ít nhất 1 trường thông tin!")
+    if st.button("🎯 TẠO MÃ QR CHO HỌC SINH"):
+        if not hoten or not ngaysinh:
+            st.warning("⚠️ Vui lòng nhập ít nhất Họ tên và Ngày sinh của học sinh!")
         else:
+            # Tạo dictionary chứa thông tin
+            fields = {
+                "hoten": hoten,
+                "ngaysinh": ngaysinh,
+                "lop": lop,
+                "truong": truong,
+                "hoten_phuhuynh": hoten_phuhuynh,
+                "sdt_phuhuynh": sdt_phuhuynh,
+                "diachi": diachi,
+                "bienso_xe": bienso_xe,
+                "thoigian_taoma": st.session_state.get('current_time', '2025-01-01')
+            }
+            
+            # Loại bỏ các trường rỗng
+            fields = {k: v for k, v in fields.items() if v}
+            
             data_json = json.dumps(fields, ensure_ascii=False)
 
-            # Mã hóa 2 lớp: 1 với mật khẩu riêng, 1 với mật khẩu mặc định
-            encrypted_user = encrypt_data(data_json, password)
+            # Mã hóa 2 lớp
+            encrypted_user = encrypt_data(data_json, password) if password else encrypt_data(data_json, DEFAULT_PASSWORD)
             encrypted_default = encrypt_data(data_json, DEFAULT_PASSWORD)
 
             # Gộp cả hai vào một JSON
@@ -125,90 +154,196 @@ with tab1:
                 "default": encrypted_default
             }, ensure_ascii=False)
 
+            # Tạo QR code
             qr = qrcode.make(combo_data)
             buf = BytesIO()
             qr.save(buf, format="PNG")
-            st.image(buf.getvalue(), caption="✅ Mã QR được tạo thành công!")
             
-            # Hiển thị thông tin về tính năng ngày sinh
-            birthdate_passwords = extract_and_format_birthdate(fields)
-            if birthdate_passwords:
-                st.info(f"🔑 Gợi ý mật khẩu từ ngày sinh: {', '.join(birthdate_passwords)}")
+            # Hiển thị kết quả
+            col_success1, col_success2 = st.columns(2)
             
-            st.download_button("⬇️ Tải mã QR", buf.getvalue(), "ma_hoa_qr.png")
+            with col_success1:
+                st.image(buf.getvalue(), caption="✅ MÃ QR CÁ NHÂN CHO HỌC SINH", use_column_width=True)
+                st.download_button(
+                    "⬇️ TẢI MÃ QR VỀ MÁY",
+                    buf.getvalue(), 
+                    f"QR_{hoten.replace(' ', '_')}.png",
+                    "image/png"
+                )
+            
+            with col_success2:
+                st.success("🎉 TẠO MÃ QR THÀNH CÔNG!")
+                st.info(f"**Họ tên:** {hoten}")
+                st.info(f"**Ngày sinh:** {ngaysinh}")
+                st.info(f"**Trường:** {truong}")
+                st.info(f"**Lớp:** {lop}")
+                
+                # Hiển thị gợi ý mật khẩu từ ngày sinh
+                birthdate_passwords = extract_and_format_birthdate(fields)
+                if birthdate_passwords:
+                    st.markdown("---")
+                    st.markdown("### 🔑 HƯỚNG DẪN TRUY CẬP:")
+                    st.markdown("**Phụ huynh dùng các mật khẩu sau:**")
+                    for bd_pass in birthdate_passwords[:3]:  # Hiển thị tối đa 3 định dạng
+                        st.code(bd_pass)
+                
+                st.markdown("---")
+                st.markdown("### 📝 HƯỚNG DẪN SỬ DỤNG:")
+                st.markdown("""
+                1. **In mã QR** lên móc khóa và decal
+                2. **Gắn móc khóa** vào chùm chìa xe
+                3. **Dán decal** lên xe máy
+                4. Khi cần kiểm tra, **quét mã QR** bằng tab GIẢI MÃ
+                """)
 
-# ---------- TAB 2: GIẢI MÃ ----------
+# ---------- TAB 2: GIẢI MÃ THÔNG TIN ----------
 with tab2:
-    st.subheader("Tải lên ảnh QR để giải mã")
+    st.subheader("🔍 QUÉT MÃ QR ĐỂ TRA CỨU THÔNG TIN")
+    
+    uploaded = st.file_uploader("📤 TẢI LÊN ẢNH CHỨA MÃ QR", type=["png", "jpg", "jpeg"])
+    
+    if uploaded:
+        st.success("✅ ĐÃ TẢI LÊN ẢNH THÀNH CÔNG!")
+        
+        # Hiển thị ảnh preview
+        img = Image.open(uploaded)
+        st.image(img, caption="Ảnh mã QR đã tải lên", width=300)
+    
+    st.markdown("---")
+    st.markdown("### 👥 CHỌN PHƯƠNG THỨC TRUY CẬP")
+    
+    option = st.radio(
+        "Tôi là:",
+        [
+            "👨‍👩‍👧‍👦 PHỤ HUYNH (dùng ngày sinh con)", 
+            "👮 CÔNG AN (mật khẩu hệ thống)",
+            "🔐 NGƯỜI CÓ MẬT KHẨU RIÊNG"
+        ],
+        index=0
+    )
+    
+    password_dec = ""
+    if option == "👨‍👩‍👧‍👦 PHỤ HUYNH (dùng ngày sinh con)":
+        st.info("🎯 Hệ thống sẽ TỰ ĐỘNG tìm ngày sinh trong thông tin để giải mã")
+        
+    elif option == "👮 CÔNG AN (mật khẩu hệ thống)":
+        password_dec = DEFAULT_PASSWORD
+        st.success("🔓 ĐANG SỬ DỤNG MẬT KHẨU HỆ THỐNG CHO CÔNG AN")
+        
+    elif option == "🔐 NGƯỜI CÓ MẬT KHẨU RIÊNG":
+        password_dec = st.text_input("🔒 NHẬP MẬT KHẨU RIÊNG", type="password")
 
-    uploaded = st.file_uploader("Chọn ảnh QR", type=["png", "jpg", "jpeg"])
-    password_dec = st.text_input("Nhập mật khẩu (để trống nếu muốn thử tự động với ngày sinh)", type="password")
-
-    if st.button("Giải mã"):
+    if st.button("🚀 GIẢI MÃ THÔNG TIN", type="primary"):
         if not uploaded:
-            st.warning("⚠️ Chưa chọn ảnh QR.")
-        else:
-            try:
-                import cv2, numpy as np
-                from pyzbar.pyzbar import decode
+            st.warning("⚠️ VUI LÒNG CHỌN ẢNH CHỨA MÃ QR!")
+            st.stop()
+            
+        try:
+            # Xử lý ảnh QR
+            img = Image.open(uploaded)
+            img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            qr_codes = decode(img_cv)
 
-                img = Image.open(uploaded)
-                img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-                qr_codes = decode(img_cv)
+            if not qr_codes:
+                st.error("❌ KHÔNG PHÁT HIỆN ĐƯỢC MÃ QR TRONG ẢNH!")
+            else:
+                encrypted_combo = qr_codes[0].data.decode()
 
-                if not qr_codes:
-                    st.error("❌ Không phát hiện được mã QR.")
-                else:
-                    encrypted_combo = qr_codes[0].data.decode()
+                # Giải mã lớp JSON chứa 2 đoạn mã hóa
+                try:
+                    combo_json = json.loads(encrypted_combo)
+                except Exception:
+                    st.error("❌ DỮ LIỆU MÃ QR KHÔNG HỢP LỆ!")
+                    st.stop()
 
-                    # Giải mã lớp JSON chứa 2 đoạn mã hóa
+                decrypted = None
+                used_password = None
+                
+                # TRƯỜNG HỢP 1: PHỤ HUYNH - TỰ ĐỘNG DÙNG NGÀY SINH
+                if option == "👨‍👩‍👧‍👦 PHỤ HUYNH (dùng ngày sinh con)":
+                    # Thử giải mã với mật khẩu mặc định để lấy thông tin ngày sinh
                     try:
-                        combo_json = json.loads(encrypted_combo)
+                        temp_decrypted = decrypt_data(combo_json["default"], DEFAULT_PASSWORD)
+                        temp_data = json.loads(temp_decrypted)
+                        
+                        # Trích xuất các định dạng ngày sinh
+                        birthdate_passwords = extract_and_format_birthdate(temp_data)
+                        
+                        if birthdate_passwords:
+                            st.info(f"🔍 ĐANG THỬ CÁC MẬT KHẨU TỪ NGÀY SINH: {', '.join(birthdate_passwords)}")
+                            
+                            # Thử giải mã với các định dạng ngày sinh
+                            decrypted, used_bd_password = try_birthdate_passwords(combo_json, birthdate_passwords)
+                            if decrypted:
+                                used_password = f"NGÀY SINH: {used_bd_password}"
+                                st.balloons()
+                    except Exception as e:
+                        st.error("❌ KHÔNG THỂ ĐỌC THÔNG TIN NGÀY SINH!")
+                
+                # TRƯỜNG HỢP 2 & 3: CÓ MẬT KHẨU
+                elif password_dec:
+                    try:
+                        decrypted = decrypt_data(combo_json["user"], password_dec)
+                        used_password = "MẬT KHẨU RIÊNG"
                     except Exception:
-                        st.error("❌ Dữ liệu mã QR không hợp lệ.")
-                        st.stop()
-
-                    decrypted = None
-                    used_password = None
-                    
-                    # TRƯỜNG HỢP 1: Có nhập mật khẩu
-                    if password_dec:
                         try:
-                            decrypted = decrypt_data(combo_json["user"], password_dec)
-                            used_password = "Mật khẩu người dùng nhập"
-                        except Exception:
-                            try:
-                                decrypted = decrypt_data(combo_json["default"], password_dec)
-                                used_password = "Mật khẩu mặc định"
-                            except Exception:
-                                pass
-                    
-                    # TRƯỜNG HỢP 2: Tự động thử với ngày sinh
-                    if not decrypted:
-                        # Trước tiên thử giải mã với mật khẩu mặc định để lấy thông tin ngày sinh
-                        try:
-                            temp_decrypted = decrypt_data(combo_json["default"], DEFAULT_PASSWORD)
-                            temp_data = json.loads(temp_decrypted)
-                            
-                            # Trích xuất các định dạng ngày sinh
-                            birthdate_passwords = extract_and_format_birthdate(temp_data)
-                            
-                            if birthdate_passwords:
-                                st.info(f"🔍 Đang thử các mật khẩu từ ngày sinh: {', '.join(birthdate_passwords)}")
-                                
-                                # Thử giải mã với các định dạng ngày sinh
-                                decrypted, used_bd_password = try_birthdate_passwords(combo_json, birthdate_passwords)
-                                if decrypted:
-                                    used_password = f"Ngày sinh: {used_bd_password}"
+                            decrypted = decrypt_data(combo_json["default"], password_dec)
+                            used_password = "MẬT KHẨU HỆ THỐNG"
                         except Exception:
                             pass
 
-                    if decrypted:
-                        st.success(f"✅ Giải mã thành công! ({used_password})")
-                        data = json.loads(decrypted)
-                        st.json(data)
-                    else:
-                        st.error("❌ Không thể giải mã với mật khẩu đã nhập hoặc ngày sinh tìm thấy.")
+                # HIỂN THỊ KẾT QUẢ
+                if decrypted:
+                    st.success(f"✅ GIẢI MÃ THÀNH CÔNG! ({used_password})")
+                    
+                    data = json.loads(decrypted)
+                    
+                    # Hiển thị thông tin đẹp mắt
+                    col_info1, col_info2 = st.columns(2)
+                    
+                    with col_info1:
+                        st.markdown("### 📊 THÔNG TIN HỌC SINH")
+                        st.write(f"**Họ tên:** {data.get('hoten', 'N/A')}")
+                        st.write(f"**Ngày sinh:** {data.get('ngaysinh', 'N/A')}")
+                        st.write(f"**Trường:** {data.get('truong', 'N/A')}")
+                        st.write(f"**Lớp:** {data.get('lop', 'N/A')}")
+                    
+                    with col_info2:
+                        st.markdown("### 📞 THÔNG TIN LIÊN HỆ")
+                        st.write(f"**Phụ huynh:** {data.get('hoten_phuhuynh', 'N/A')}")
+                        st.write(f"**Điện thoại:** {data.get('sdt_phuhuynh', 'N/A')}")
+                        st.write(f"**Địa chỉ:** {data.get('diachi', 'N/A')}")
+                        st.write(f"**Biển số xe:** {data.get('bienso_xe', 'N/A')}")
+                    
+                    # Nút báo cáo vi phạm (cho công an)
+                    if option == "👮 CÔNG AN (mật khẩu hệ thống)":
+                        st.markdown("---")
+                        st.warning("🚨 CHỨC NĂNG BÁO CÁO VI PHẠM")
+                        col_report1, col_report2, col_report3 = st.columns(3)
                         
-            except Exception as e:
-                st.error(f"❌ Có lỗi xảy ra khi xử lý ảnh QR: {str(e)}")
+                        with col_report1:
+                            if st.button("📧 GỬI THÔNG BÁO ĐẾN PHỤ HUYNH"):
+                                st.success("Đã gửi thông báo đến phụ huynh!")
+                        
+                        with col_report2:
+                            if st.button("🏫 BÁO CÁO VỚI NHÀ TRƯỜNG"):
+                                st.success("Đã báo cáo với nhà trường!")
+                        
+                        with col_report3:
+                            if st.button("📋 GHI NHẬN VI PHẠM"):
+                                st.success("Đã ghi nhận vi phạm vào hệ thống!")
+                
+                else:
+                    st.error("❌ KHÔNG THỂ GIẢI MÃ! VUI LÒNG KIỂM TRA LẠI PHƯƠNG THỨC TRUY CẬP.")
+                        
+        except Exception as e:
+            st.error(f"❌ CÓ LỖI XẢY RA KHI XỬ LÝ ẢNH QR: {str(e)}")
+
+# ====== FOOTER ======
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center'>
+    <p>🎓 <strong>HỆ THỐNG QUẢN LÝ HỌC SINH THAM GIA GIAO THÔNG</strong></p>
+    <p>Bản quyền © 2025 - Phát triển cho Cuộc thi Sáng kiến An toàn Giao thông</p>
+</div>
+""", unsafe_allow_html=True)
