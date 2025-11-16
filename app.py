@@ -61,7 +61,7 @@ with tab1:
         else:
             st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE")
             hoten_chuxe = st.text_input("Họ tên chủ xe *", placeholder="Nguyễn Văn B")
-            ngaysinh_chuxe = st.text_input("Ngày sinh chủ xe", placeholder="20/05/1975")
+            ngaysinh_chuxe = st.text_input("Ngày sinh chủ xe *", placeholder="20/05/1975")
             sdt_chuxe = st.text_input("Số điện thoại chủ xe *", placeholder="0912345678")
     
     with col2:
@@ -75,6 +75,7 @@ with tab1:
         elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
             st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE")
             hoten_chuxe = st.text_input("Họ tên chủ xe *", placeholder="Nguyễn Văn B")
+            ngaysinh_chuxe = st.text_input("Ngày sinh chủ xe *", placeholder="20/05/1975")
             sdt_chuxe = st.text_input("Số điện thoại chủ xe *", placeholder="0912345678")
             quanhe_voihocsinh = st.selectbox("Quan hệ với học sinh", 
                                            ["Bố", "Mẹ", "Ông", "Bà", "Anh", "Chị", "Khác"])
@@ -82,6 +83,25 @@ with tab1:
         else:  # XE GIA ĐÌNH
             loai_xe = st.text_input("Loại xe", placeholder="Vision")
             mau_xe = st.text_input("Màu xe", placeholder="Trắng")
+    
+    st.markdown("### 🔑 THIẾT LẬP MẬT KHẨU")
+    col_pass1, col_pass2 = st.columns(2)
+    
+    with col_pass1:
+        # Mật khẩu tùy chỉnh cho QR
+        custom_password = st.text_input(
+            "Mật khẩu tùy chỉnh *", 
+            placeholder="Nhập mật khẩu để mở QR sau này",
+            type="password",
+            help="Mật khẩu này sẽ dùng để mở QR cùng với mật khẩu Công an và ngày sinh"
+        )
+        
+    with col_pass2:
+        confirm_password = st.text_input(
+            "Xác nhận mật khẩu *", 
+            placeholder="Nhập lại mật khẩu",
+            type="password"
+        )
     
     st.markdown("### 📞 THÔNG TIN LIÊN HỆ (tùy chọn)")
     diachi = st.text_input("Địa chỉ", placeholder="123 Đường XYZ, Quận 1, TP.HCM")
@@ -98,15 +118,21 @@ with tab1:
             if not hoten_hocsinh: missing_fields.append("Họ tên học sinh")
             if not ngaysinh_hocsinh: missing_fields.append("Ngày sinh học sinh")
             if not hoten_chuxe: missing_fields.append("Họ tên chủ xe")
+            if not ngaysinh_chuxe: missing_fields.append("Ngày sinh chủ xe")
             if not sdt_chuxe: missing_fields.append("Số điện thoại chủ xe")
             
         else:  # XE GIA ĐÌNH
             if not hoten_chuxe: missing_fields.append("Họ tên chủ xe")
+            if not ngaysinh_chuxe: missing_fields.append("Ngày sinh chủ xe")
             if not sdt_chuxe: missing_fields.append("Số điện thoại chủ xe")
         
         if not bienso_xe: missing_fields.append("Biển số xe")
+        if not custom_password: missing_fields.append("Mật khẩu tùy chỉnh")
+        if not confirm_password: missing_fields.append("Xác nhận mật khẩu")
         
-        if missing_fields:
+        if custom_password != confirm_password:
+            st.error("⚠️ MẬT KHẨU XÁC NHẬN KHÔNG KHỚP!")
+        elif missing_fields:
             st.error(f"⚠️ Vui lòng nhập các thông tin bắt buộc: {', '.join(missing_fields)}")
         else:
             # Tạo dictionary chứa thông tin
@@ -125,9 +151,10 @@ with tab1:
                     "lop": lop,
                     "truong": truong,
                     "loai_xe_chi_tiet": loai_xe,
-                    "mau_xe": mau_xe,
-                    "mat_khau_phu_huynh": ngaysinh_hocsinh
+                    "mau_xe": mau_xe
                 })
+                # Xác định ngày sinh để mở QR
+                ngaysinh_mo_qr = ngaysinh_hocsinh
                 
             elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
                 fields.update({
@@ -136,10 +163,12 @@ with tab1:
                     "lop": lop,
                     "truong": truong,
                     "hoten_chuxe": hoten_chuxe,
+                    "ngaysinh_chuxe": ngaysinh_chuxe,
                     "sdt_chuxe": sdt_chuxe,
-                    "quanhe_voihocsinh": quanhe_voihocsinh,
-                    "mat_khau_phu_huynh": ngaysinh_hocsinh
+                    "quanhe_voihocsinh": quanhe_voihocsinh
                 })
+                # Có thể dùng cả ngày sinh học sinh hoặc chủ xe
+                ngaysinh_mo_qr = ngaysinh_hocsinh  # hoặc có thể cho chọn
                 
             else:  # XE GIA ĐÌNH
                 fields.update({
@@ -147,30 +176,26 @@ with tab1:
                     "ngaysinh_chuxe": ngaysinh_chuxe,
                     "sdt_chuxe": sdt_chuxe,
                     "loai_xe_chi_tiet": loai_xe,
-                    "mau_xe": mau_xe,
-                    "mat_khau_phu_huynh": ngaysinh_chuxe if ngaysinh_chuxe else hoten_chuxe
+                    "mau_xe": mau_xe
                 })
+                # Dùng ngày sinh chủ xe
+                ngaysinh_mo_qr = ngaysinh_chuxe
             
             # Loại bỏ các trường rỗng
             fields = {k: v for k, v in fields.items() if v}
             
             data_json = json.dumps(fields, ensure_ascii=False)
 
-            # Mã hóa 2 lớp
+            # Mã hóa 3 lớp với các mật khẩu khác nhau
             encrypted_default = encrypt_data(data_json, DEFAULT_PASSWORD)
-            
-            # Mật khẩu phụ huynh khác nhau theo loại xe
-            if loai_doituong in ["🚗 XE CÁ NHÂN HỌC SINH", "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM"]:
-                mat_khau_phu_huynh = ngaysinh_hocsinh
-            else:
-                mat_khau_phu_huynh = ngaysinh_chuxe if ngaysinh_chuxe else hoten_chuxe
-                
-            encrypted_birthdate = encrypt_data(data_json, mat_khau_phu_huynh)
+            encrypted_birthdate = encrypt_data(data_json, ngaysinh_mo_qr)
+            encrypted_custom = encrypt_data(data_json, custom_password)
 
-            # Gộp cả hai vào một JSON
+            # Gộp cả ba vào một JSON
             combo_data = json.dumps({
                 "cong_an": encrypted_default,
-                "phu_huynh": encrypted_birthdate
+                "ngay_sinh": encrypted_birthdate,
+                "custom": encrypted_custom
             }, ensure_ascii=False)
 
             # Tạo QR code
@@ -197,25 +222,29 @@ with tab1:
                     st.info(f"**Loại:** Xe cá nhân học sinh")
                     st.info(f"**Học sinh:** {hoten_hocsinh}")
                     st.info(f"**Biển số:** {bienso_xe}")
-                    st.info(f"**Mật khẩu phụ huynh:** Ngày sinh học sinh")
                     
                 elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
                     st.info(f"**Loại:** Xe gia đình - học sinh sử dụng tạm")
                     st.info(f"**Học sinh:** {hoten_hocsinh}")
                     st.info(f"**Chủ xe:** {hoten_chuxe} ({quanhe_voihocsinh})")
                     st.info(f"**Biển số:** {bienso_xe}")
-                    st.info(f"**Mật khẩu phụ huynh:** Ngày sinh học sinh")
                     
                 else:
                     st.info(f"**Loại:** Xe gia đình")
                     st.info(f"**Chủ xe:** {hoten_chuxe}")
                     st.info(f"**Biển số:** {bienso_xe}")
-                    st.info(f"**Mật khẩu phụ huynh:** Ngày sinh chủ xe")
                 
                 st.markdown("---")
-                st.markdown("### 🔑 HƯỚNG DẪN TRUY CẬP:")
-                st.markdown("**Phụ huynh:** Dùng mật khẩu đã ghi ở trên")
-                st.markdown("**Công an:** Dùng mật khẩu hệ thống")
+                st.markdown("### 🔑 THÔNG TIN MẬT KHẨU:")
+                st.success(f"**Mật khẩu tùy chỉnh:** {custom_password}")
+                st.info(f"**Ngày sinh để mở QR:** {ngaysinh_mo_qr}")
+                st.info("**Mật khẩu Công an:** Hệ thống")
+                
+                st.markdown("### 📝 HƯỚNG DẪN TRUY CẬP:")
+                st.markdown("**Có 3 cách để mở QR:**")
+                st.markdown("1. **Mật khẩu tùy chỉnh** (khuyến nghị)")
+                st.markdown("2. **Ngày sinh** (học sinh/chủ xe)")
+                st.markdown("3. **Mật khẩu Công an** (hệ thống)")
 
 # ---------- TAB 2: GIẢI MÃ THÔNG TIN ----------
 with tab2:
@@ -226,30 +255,42 @@ with tab2:
     
     st.markdown("---")
     st.markdown("### 🔄 HOẶC NHẬP THỦ CÔNG DỮ LIỆU QR")
-    manual_qr_data = st.text_area("Dán dữ liệu từ mã QR vào đây", placeholder='{"cong_an": "encrypted_data", "phu_huynh": "encrypted_data"}', height=100)
+    manual_qr_data = st.text_area("Dán dữ liệu từ mã QR vào đây", placeholder='{"cong_an": "encrypted_data", "ngay_sinh": "encrypted_data", "custom": "encrypted_data"}', height=100)
     
     st.markdown("---")
-    st.markdown("### 👥 CHỌN PHƯƠNG THỨC TRUY CẬP")
+    st.markdown("### 🔑 CHỌN PHƯƠNG THỨC MỞ KHÓA")
     
     option = st.radio(
-        "Tôi là:",
+        "Chọn cách mở QR:",
         [
-            "👨‍👩‍👧‍👦 PHỤ HUYNH/CHỦ XE (dùng mật khẩu)", 
-            "👮 CÔNG AN (dùng mật khẩu hệ thống)"
+            "🔐 MẬT KHẨU TÙY CHỈNH", 
+            "🎂 NGÀY SINH",
+            "👮 MẬT KHẨU CÔNG AN"
         ],
         index=0
     )
     
     password_dec = ""
-    if option == "👨‍👩‍👧‍👦 PHỤ HUYNH/CHỦ XE (dùng mật khẩu)":
-        password_dec = st.text_input("🔒 NHẬP MẬT KHẨU", 
-                                   placeholder="Nhập mật khẩu (ngày sinh học sinh/chủ xe)",
+    password_field_key = ""
+    
+    if option == "🔐 MẬT KHẨU TÙY CHỈNH":
+        password_dec = st.text_input("🔒 NHẬP MẬT KHẨU TÙY CHỈNH", 
+                                   placeholder="Nhập mật khẩu bạn đã đặt khi tạo QR",
                                    type="password")
-        st.info("💡 Nhập mật khẩu đã được cung cấp khi tạo mã QR")
+        password_field_key = "custom"
+        st.info("💡 Nhập mật khẩu tùy chỉnh đã đặt khi tạo mã QR")
         
-    elif option == "👮 CÔNG AN (dùng mật khẩu hệ thống)":
+    elif option == "🎂 NGÀY SINH":
+        password_dec = st.text_input("🔒 NHẬP NGÀY SINH", 
+                                   placeholder="Nhập ngày sinh học sinh/chủ xe",
+                                   help="Định dạng: dd/mm/yyyy hoặc dd-mm-yyyy")
+        password_field_key = "ngay_sinh"
+        st.info("💡 Nhập ngày sinh của học sinh (xe cá nhân) hoặc chủ xe (xe gia đình)")
+        
+    elif option == "👮 MẬT KHẨU CÔNG AN":
         password_dec = st.text_input("🔒 NHẬP MẬT KHẨU HỆ THỐNG", 
                                    type="password")
+        password_field_key = "cong_an"
         st.info("💡 Nhập mật khẩu được cấp cho Công an")
 
     if st.button("🚀 GIẢI MÃ THÔNG TIN", type="primary"):
@@ -311,24 +352,24 @@ with tab2:
                 st.stop()
 
             decrypted = None
-            used_method = None
+            used_method = ""
             
-            if option == "👨‍👩‍👧‍👦 PHỤ HUYNH/CHỦ XE (dùng mật khẩu)":
-                try:
-                    decrypted = decrypt_data(combo_json["phu_huynh"], password_dec)
-                    used_method = "MẬT KHẨU PHỤ HUYNH/CHỦ XE"
-                except Exception:
-                    st.error("❌ MẬT KHẨU KHÔNG CHÍNH XÁC!")
-                    
-            elif option == "👮 CÔNG AN (dùng mật khẩu hệ thống)":
-                try:
-                    decrypted = decrypt_data(combo_json["cong_an"], password_dec)
+            try:
+                decrypted = decrypt_data(combo_json[password_field_key], password_dec)
+                
+                if option == "🔐 MẬT KHẨU TÙY CHỈNH":
+                    used_method = "MẬT KHẨU TÙY CHỈNH"
+                elif option == "🎂 NGÀY SINH":
+                    used_method = "NGÀY SINH"
+                elif option == "👮 MẬT KHẨU CÔNG AN":
                     if password_dec == DEFAULT_PASSWORD:
                         used_method = "MẬT KHẨU CÔNG AN"
                     else:
                         used_method = "MẬT KHẨU HỆ THỐNG"
-                except Exception:
-                    st.error("❌ MẬT KHẨU KHÔNG CHÍNH XÁC!")
+                        
+            except Exception:
+                st.error("❌ MẬT KHẨU KHÔNG CHÍNH XÁC!")
+                st.stop()
 
             if decrypted:
                 st.success(f"✅ GIẢI MÃ THÀNH CÔNG! ({used_method})")
@@ -344,6 +385,7 @@ with tab2:
                     st.write(f"**Loại xe:** {data.get('loai_xe', 'N/A')}")
                     st.write(f"**Biển số:** {data.get('bienso_xe', 'N/A')}")
                     st.write(f"**Địa chỉ:** {data.get('diachi', 'N/A')}")
+                    st.write(f"**Thời gian tạo:** {data.get('thoigian_taoma', 'N/A')}")
                 
                 with col_info2:
                     if data.get('loai_xe') == "🚗 XE CÁ NHÂN HỌC SINH":
@@ -352,14 +394,20 @@ with tab2:
                         st.write(f"**Ngày sinh:** {data.get('ngaysinh_hocsinh', 'N/A')}")
                         st.write(f"**Trường:** {data.get('truong', 'N/A')}")
                         st.write(f"**Lớp:** {data.get('lop', 'N/A')}")
+                        if data.get('loai_xe_chi_tiet'):
+                            st.write(f"**Loại xe:** {data.get('loai_xe_chi_tiet', 'N/A')}")
+                        if data.get('mau_xe'):
+                            st.write(f"**Màu xe:** {data.get('mau_xe', 'N/A')}")
                         
                     elif data.get('loai_xe') == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
                         st.markdown("### 👤 THÔNG TIN HỌC SINH")
                         st.write(f"**Họ tên:** {data.get('hoten_hocsinh', 'N/A')}")
                         st.write(f"**Ngày sinh:** {data.get('ngaysinh_hocsinh', 'N/A')}")
                         st.write(f"**Trường:** {data.get('truong', 'N/A')}")
+                        st.write(f"**Lớp:** {data.get('lop', 'N/A')}")
                         st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE")
                         st.write(f"**Chủ xe:** {data.get('hoten_chuxe', 'N/A')}")
+                        st.write(f"**Ngày sinh:** {data.get('ngaysinh_chuxe', 'N/A')}")
                         st.write(f"**Quan hệ:** {data.get('quanhe_voihocsinh', 'N/A')}")
                         st.write(f"**Điện thoại:** {data.get('sdt_chuxe', 'N/A')}")
                         
@@ -368,10 +416,13 @@ with tab2:
                         st.write(f"**Chủ xe:** {data.get('hoten_chuxe', 'N/A')}")
                         st.write(f"**Ngày sinh:** {data.get('ngaysinh_chuxe', 'N/A')}")
                         st.write(f"**Điện thoại:** {data.get('sdt_chuxe', 'N/A')}")
-                        st.write(f"**Loại xe:** {data.get('loai_xe_chi_tiet', 'N/A')}")
+                        if data.get('loai_xe_chi_tiet'):
+                            st.write(f"**Loại xe:** {data.get('loai_xe_chi_tiet', 'N/A')}")
+                        if data.get('mau_xe'):
+                            st.write(f"**Màu xe:** {data.get('mau_xe', 'N/A')}")
                 
                 # Chức năng cho Công an
-                if option == "👮 CÔNG AN (dùng mật khẩu hệ thống)":
+                if option == "👮 MẬT KHẨU CÔNG AN":
                     st.markdown("---")
                     st.warning("🚨 CHỨC NĂNG BÁO CÁO VI PHẠM")
                     col_report1, col_report2 = st.columns(2)
