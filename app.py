@@ -38,12 +38,13 @@ tab1, tab2 = st.tabs(["📦 TẠO MÃ QR", "🔓 GIẢI MÃ THÔNG TIN"])
 with tab1:
     st.subheader("📋 NHẬP THÔNG TIN ĐỂ TẠO MÃ QR")
     
-    st.markdown("### 🎯 CHỌN LOẠI ĐỐI TƯỢNG SỬ DỤNG")
+    st.markdown("### 🎯 CHỌN LOẠI ĐỐI TƯỢNG")
     loai_doituong = st.radio(
-        "Đây là:",
+        "Loại xe:",
         [
-            "🚗 XE CÁ NHÂN CỦA HỌC SINH",
-            "🏠 XE GIA ĐÌNH (học sinh sử dụng tạm)"
+            "🚗 XE CÁ NHÂN HỌC SINH",
+            "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM", 
+            "🏠 XE GIA ĐÌNH (chỉ thông tin chủ xe)"
         ],
         index=0
     )
@@ -51,68 +52,103 @@ with tab1:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### 👤 THÔNG TIN NGƯỜI SỬ DỤNG")
-        hoten_hocsinh = st.text_input("Họ tên học sinh *", placeholder="Nguyễn Văn A")
-        ngaysinh_hocsinh = st.text_input("Ngày sinh học sinh *", placeholder="15/07/2008")
-        lop = st.text_input("Lớp", placeholder="10A1")
-        truong = st.text_input("Trường", placeholder="THPT ABC")
+        if loai_doituong in ["🚗 XE CÁ NHÂN HỌC SINH", "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM"]:
+            st.markdown("### 👤 THÔNG TIN HỌC SINH")
+            hoten_hocsinh = st.text_input("Họ tên học sinh *", placeholder="Nguyễn Văn A")
+            ngaysinh_hocsinh = st.text_input("Ngày sinh học sinh *", placeholder="15/07/2008")
+            lop = st.text_input("Lớp", placeholder="10A1")
+            truong = st.text_input("Trường", placeholder="THPT ABC")
+        else:
+            st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE")
+            hoten_chuxe = st.text_input("Họ tên chủ xe *", placeholder="Nguyễn Văn B")
+            ngaysinh_chuxe = st.text_input("Ngày sinh chủ xe", placeholder="20/05/1975")
+            sdt_chuxe = st.text_input("Số điện thoại chủ xe *", placeholder="0912345678")
     
     with col2:
-        if loai_doituong == "🚗 XE CÁ NHÂN CỦA HỌC SINH":
-            st.markdown("### 📄 THÔNG TIN XE CÁ NHÂN")
-            bienso_xe = st.text_input("Biển số xe *", placeholder="59-A1 123.45")
+        st.markdown("### 🚗 THÔNG TIN XE")
+        bienso_xe = st.text_input("Biển số xe *", placeholder="59-A1 123.45")
+        
+        if loai_doituong == "🚗 XE CÁ NHÂN HỌC SINH":
             loai_xe = st.text_input("Loại xe", placeholder="Wave Alpha")
             mau_xe = st.text_input("Màu xe", placeholder="Đen")
-        else:
-            st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE GIA ĐÌNH")
+            
+        elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
+            st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE")
             hoten_chuxe = st.text_input("Họ tên chủ xe *", placeholder="Nguyễn Văn B")
             sdt_chuxe = st.text_input("Số điện thoại chủ xe *", placeholder="0912345678")
-            bienso_xe = st.text_input("Biển số xe gia đình *", placeholder="59-A1 123.45")
+            quanhe_voihocsinh = st.selectbox("Quan hệ với học sinh", 
+                                           ["Bố", "Mẹ", "Ông", "Bà", "Anh", "Chị", "Khác"])
+            
+        else:  # XE GIA ĐÌNH
+            loai_xe = st.text_input("Loại xe", placeholder="Vision")
+            mau_xe = st.text_input("Màu xe", placeholder="Trắng")
     
     st.markdown("### 📞 THÔNG TIN LIÊN HỆ (tùy chọn)")
     diachi = st.text_input("Địa chỉ", placeholder="123 Đường XYZ, Quận 1, TP.HCM")
 
     if st.button("🎯 TẠO MÃ QR", type="primary"):
-        # Kiểm tra thông tin bắt buộc
+        # Kiểm tra thông tin bắt buộc theo từng loại
         missing_fields = []
-        if not hoten_hocsinh: missing_fields.append("Họ tên học sinh")
-        if not ngaysinh_hocsinh: missing_fields.append("Ngày sinh học sinh")
         
-        if loai_doituong == "🚗 XE CÁ NHÂN CỦA HỌC SINH":
-            if not bienso_xe: missing_fields.append("Biển số xe")
-        else:
+        if loai_doituong == "🚗 XE CÁ NHÂN HỌC SINH":
+            if not hoten_hocsinh: missing_fields.append("Họ tên học sinh")
+            if not ngaysinh_hocsinh: missing_fields.append("Ngày sinh học sinh")
+            
+        elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
+            if not hoten_hocsinh: missing_fields.append("Họ tên học sinh")
+            if not ngaysinh_hocsinh: missing_fields.append("Ngày sinh học sinh")
             if not hoten_chuxe: missing_fields.append("Họ tên chủ xe")
             if not sdt_chuxe: missing_fields.append("Số điện thoại chủ xe")
-            if not bienso_xe: missing_fields.append("Biển số xe")
+            
+        else:  # XE GIA ĐÌNH
+            if not hoten_chuxe: missing_fields.append("Họ tên chủ xe")
+            if not sdt_chuxe: missing_fields.append("Số điện thoại chủ xe")
+        
+        if not bienso_xe: missing_fields.append("Biển số xe")
         
         if missing_fields:
             st.error(f"⚠️ Vui lòng nhập các thông tin bắt buộc: {', '.join(missing_fields)}")
         else:
             # Tạo dictionary chứa thông tin
             fields = {
-                "loai_doituong": loai_doituong,
-                "hoten_hocsinh": hoten_hocsinh,
-                "ngaysinh_hocsinh": ngaysinh_hocsinh,
-                "lop": lop,
-                "truong": truong,
+                "loai_xe": loai_doituong,
+                "bienso_xe": bienso_xe,
                 "diachi": diachi,
                 "thoigian_taoma": "2025-01-01 00:00:00"
             }
             
-            # Thêm thông tin theo loại đối tượng
-            if loai_doituong == "🚗 XE CÁ NHÂN CỦA HỌC SINH":
+            # Thêm thông tin theo loại xe
+            if loai_doituong == "🚗 XE CÁ NHÂN HỌC SINH":
                 fields.update({
-                    "bienso_xe": bienso_xe,
-                    "loai_xe": loai_xe,
+                    "hoten_hocsinh": hoten_hocsinh,
+                    "ngaysinh_hocsinh": ngaysinh_hocsinh,
+                    "lop": lop,
+                    "truong": truong,
+                    "loai_xe_chi_tiet": loai_xe,
                     "mau_xe": mau_xe,
-                    "loai_xe": "XE CÁ NHÂN HỌC SINH"
+                    "mat_khau_phu_huynh": ngaysinh_hocsinh
                 })
-            else:
+                
+            elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
                 fields.update({
+                    "hoten_hocsinh": hoten_hocsinh,
+                    "ngaysinh_hocsinh": ngaysinh_hocsinh,
+                    "lop": lop,
+                    "truong": truong,
                     "hoten_chuxe": hoten_chuxe,
                     "sdt_chuxe": sdt_chuxe,
-                    "bienso_xe": bienso_xe,
-                    "loai_xe": "XE GIA ĐÌNH"
+                    "quanhe_voihocsinh": quanhe_voihocsinh,
+                    "mat_khau_phu_huynh": ngaysinh_hocsinh
+                })
+                
+            else:  # XE GIA ĐÌNH
+                fields.update({
+                    "hoten_chuxe": hoten_chuxe,
+                    "ngaysinh_chuxe": ngaysinh_chuxe,
+                    "sdt_chuxe": sdt_chuxe,
+                    "loai_xe_chi_tiet": loai_xe,
+                    "mau_xe": mau_xe,
+                    "mat_khau_phu_huynh": ngaysinh_chuxe if ngaysinh_chuxe else hoten_chuxe
                 })
             
             # Loại bỏ các trường rỗng
@@ -121,8 +157,15 @@ with tab1:
             data_json = json.dumps(fields, ensure_ascii=False)
 
             # Mã hóa 2 lớp
-            encrypted_default = encrypt_data(data_json, DEFAULT_PASSWORD)  # Cho Công an
-            encrypted_birthdate = encrypt_data(data_json, ngaysinh_hocsinh) # Cho Phụ huynh
+            encrypted_default = encrypt_data(data_json, DEFAULT_PASSWORD)
+            
+            # Mật khẩu phụ huynh khác nhau theo loại xe
+            if loai_doituong in ["🚗 XE CÁ NHÂN HỌC SINH", "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM"]:
+                mat_khau_phu_huynh = ngaysinh_hocsinh
+            else:
+                mat_khau_phu_huynh = ngaysinh_chuxe if ngaysinh_chuxe else hoten_chuxe
+                
+            encrypted_birthdate = encrypt_data(data_json, mat_khau_phu_huynh)
 
             # Gộp cả hai vào một JSON
             combo_data = json.dumps({
@@ -143,38 +186,36 @@ with tab1:
                 st.download_button(
                     "⬇️ TẢI MÃ QR VỀ MÁY",
                     buf.getvalue(), 
-                    f"QR_{hoten_hocsinh.replace(' ', '_')}.png",
+                    f"QR_{bienso_xe.replace(' ', '_')}.png",
                     "image/png"
                 )
             
             with col_success2:
                 st.success("🎉 TẠO MÃ QR THÀNH CÔNG!")
                 
-                if loai_doituong == "🚗 XE CÁ NHÂN CỦA HỌC SINH":
+                if loai_doituong == "🚗 XE CÁ NHÂN HỌC SINH":
                     st.info(f"**Loại:** Xe cá nhân học sinh")
                     st.info(f"**Học sinh:** {hoten_hocsinh}")
                     st.info(f"**Biển số:** {bienso_xe}")
+                    st.info(f"**Mật khẩu phụ huynh:** Ngày sinh học sinh")
+                    
+                elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
+                    st.info(f"**Loại:** Xe gia đình - học sinh sử dụng tạm")
+                    st.info(f"**Học sinh:** {hoten_hocsinh}")
+                    st.info(f"**Chủ xe:** {hoten_chuxe} ({quanhe_voihocsinh})")
+                    st.info(f"**Biển số:** {bienso_xe}")
+                    st.info(f"**Mật khẩu phụ huynh:** Ngày sinh học sinh")
+                    
                 else:
                     st.info(f"**Loại:** Xe gia đình")
-                    st.info(f"**Học sinh:** {hoten_hocsinh}")
                     st.info(f"**Chủ xe:** {hoten_chuxe}")
                     st.info(f"**Biển số:** {bienso_xe}")
-                
-                st.info(f"**Ngày sinh:** {ngaysinh_hocsinh}")
+                    st.info(f"**Mật khẩu phụ huynh:** Ngày sinh chủ xe")
                 
                 st.markdown("---")
                 st.markdown("### 🔑 HƯỚNG DẪN TRUY CẬP:")
-                st.markdown("**Phụ huynh:** Dùng ngày sinh của con để giải mã")
+                st.markdown("**Phụ huynh:** Dùng mật khẩu đã ghi ở trên")
                 st.markdown("**Công an:** Dùng mật khẩu hệ thống")
-                
-                st.markdown("---")
-                st.markdown("### 📝 HƯỚNG DẪN SỬ DỤNG:")
-                st.markdown("""
-                1. **In mã QR** lên móc khóa và decal
-                2. **Gắn móc khóa** vào chùm chìa xe
-                3. **Dán decal** lên xe máy
-                4. Khi cần kiểm tra, **quét mã QR** bằng tab GIẢI MÃ
-                """)
 
 # ---------- TAB 2: GIẢI MÃ THÔNG TIN ----------
 with tab2:
@@ -193,18 +234,18 @@ with tab2:
     option = st.radio(
         "Tôi là:",
         [
-            "👨‍👩‍👧‍👦 PHỤ HUYNH (dùng ngày sinh con)", 
+            "👨‍👩‍👧‍👦 PHỤ HUYNH/CHỦ XE (dùng mật khẩu)", 
             "👮 CÔNG AN (dùng mật khẩu hệ thống)"
         ],
         index=0
     )
     
     password_dec = ""
-    if option == "👨‍👩‍👧‍👦 PHỤ HUYNH (dùng ngày sinh con)":
-        password_dec = st.text_input("🔒 NHẬP NGÀY SINH CỦA CON", 
-                                   placeholder="Nhập ngày sinh (VD: 15/07/2008)",
+    if option == "👨‍👩‍👧‍👦 PHỤ HUYNH/CHỦ XE (dùng mật khẩu)":
+        password_dec = st.text_input("🔒 NHẬP MẬT KHẨU", 
+                                   placeholder="Nhập mật khẩu (ngày sinh học sinh/chủ xe)",
                                    type="password")
-        st.info("💡 Nhập chính xác ngày sinh của con bạn như đã đăng ký")
+        st.info("💡 Nhập mật khẩu đã được cung cấp khi tạo mã QR")
         
     elif option == "👮 CÔNG AN (dùng mật khẩu hệ thống)":
         password_dec = st.text_input("🔒 NHẬP MẬT KHẨU HỆ THỐNG", 
@@ -272,12 +313,12 @@ with tab2:
             decrypted = None
             used_method = None
             
-            if option == "👨‍👩‍👧‍👦 PHỤ HUYNH (dùng ngày sinh con)":
+            if option == "👨‍👩‍👧‍👦 PHỤ HUYNH/CHỦ XE (dùng mật khẩu)":
                 try:
                     decrypted = decrypt_data(combo_json["phu_huynh"], password_dec)
-                    used_method = "NGÀY SINH"
+                    used_method = "MẬT KHẨU PHỤ HUYNH/CHỦ XE"
                 except Exception:
-                    st.error("❌ NGÀY SINH KHÔNG CHÍNH XÁC!")
+                    st.error("❌ MẬT KHẨU KHÔNG CHÍNH XÁC!")
                     
             elif option == "👮 CÔNG AN (dùng mật khẩu hệ thống)":
                 try:
@@ -295,30 +336,39 @@ with tab2:
                 
                 data = json.loads(decrypted)
                 
-                # Hiển thị thông tin theo loại đối tượng
+                # Hiển thị thông tin theo loại xe
                 col_info1, col_info2 = st.columns(2)
                 
                 with col_info1:
-                    st.markdown("### 📊 THÔNG TIN HỌC SINH")
-                    st.write(f"**Họ tên:** {data.get('hoten_hocsinh', 'N/A')}")
-                    st.write(f"**Ngày sinh:** {data.get('ngaysinh_hocsinh', 'N/A')}")
-                    st.write(f"**Trường:** {data.get('truong', 'N/A')}")
-                    st.write(f"**Lớp:** {data.get('lop', 'N/A')}")
-                    st.write(f"**Loại xe:** {data.get('loai_doituong', 'N/A')}")
+                    st.markdown("### 📊 THÔNG TIN CHUNG")
+                    st.write(f"**Loại xe:** {data.get('loai_xe', 'N/A')}")
+                    st.write(f"**Biển số:** {data.get('bienso_xe', 'N/A')}")
+                    st.write(f"**Địa chỉ:** {data.get('diachi', 'N/A')}")
                 
                 with col_info2:
-                    st.markdown("### 🚗 THÔNG TIN XE")
-                    st.write(f"**Biển số:** {data.get('bienso_xe', 'N/A')}")
-                    
-                    if data.get('loai_doituong') == "🏠 XE GIA ĐÌNH (học sinh sử dụng tạm)":
+                    if data.get('loai_xe') == "🚗 XE CÁ NHÂN HỌC SINH":
+                        st.markdown("### 👤 THÔNG TIN HỌC SINH")
+                        st.write(f"**Họ tên:** {data.get('hoten_hocsinh', 'N/A')}")
+                        st.write(f"**Ngày sinh:** {data.get('ngaysinh_hocsinh', 'N/A')}")
+                        st.write(f"**Trường:** {data.get('truong', 'N/A')}")
+                        st.write(f"**Lớp:** {data.get('lop', 'N/A')}")
+                        
+                    elif data.get('loai_xe') == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
+                        st.markdown("### 👤 THÔNG TIN HỌC SINH")
+                        st.write(f"**Họ tên:** {data.get('hoten_hocsinh', 'N/A')}")
+                        st.write(f"**Ngày sinh:** {data.get('ngaysinh_hocsinh', 'N/A')}")
+                        st.write(f"**Trường:** {data.get('truong', 'N/A')}")
                         st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE")
                         st.write(f"**Chủ xe:** {data.get('hoten_chuxe', 'N/A')}")
+                        st.write(f"**Quan hệ:** {data.get('quanhe_voihocsinh', 'N/A')}")
                         st.write(f"**Điện thoại:** {data.get('sdt_chuxe', 'N/A')}")
-                    else:
-                        st.write(f"**Loại xe:** {data.get('loai_xe', 'N/A')}")
-                        st.write(f"**Màu xe:** {data.get('mau_xe', 'N/A')}")
-                    
-                    st.write(f"**Địa chỉ:** {data.get('diachi', 'N/A')}")
+                        
+                    else:  # XE GIA ĐÌNH
+                        st.markdown("### 👨‍👩‍👧‍👦 THÔNG TIN CHỦ XE")
+                        st.write(f"**Chủ xe:** {data.get('hoten_chuxe', 'N/A')}")
+                        st.write(f"**Ngày sinh:** {data.get('ngaysinh_chuxe', 'N/A')}")
+                        st.write(f"**Điện thoại:** {data.get('sdt_chuxe', 'N/A')}")
+                        st.write(f"**Loại xe:** {data.get('loai_xe_chi_tiet', 'N/A')}")
                 
                 # Chức năng cho Công an
                 if option == "👮 CÔNG AN (dùng mật khẩu hệ thống)":
@@ -327,16 +377,19 @@ with tab2:
                     col_report1, col_report2 = st.columns(2)
                     
                     with col_report1:
-                        if st.button("📧 GỬI THÔNG BÁO ĐẾN PHỤ HUYNH"):
-                            if data.get('loai_doituong') == "🏠 XE GIA ĐÌNH (học sinh sử dụng tạm)":
-                                st.success(f"Đã gửi thông báo đến {data.get('hoten_chuxe', 'chủ xe')}!")
+                        if st.button("📧 GỬI THÔNG BÁO"):
+                            if data.get('loai_xe') in ["🚗 XE CÁ NHÂN HỌC SINH", "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM"]:
+                                st.success(f"Đã gửi thông báo đến phụ huynh học sinh {data.get('hoten_hocsinh', '')}!")
                             else:
-                                st.success(f"Đã gửi thông báo đến phụ huynh học sinh!")
+                                st.success(f"Đã gửi thông báo đến chủ xe {data.get('hoten_chuxe', '')}!")
                     
                     with col_report2:
-                        if st.button("🏫 BÁO CÁO VỚI NHÀ TRƯỜNG"):
-                            st.success(f"Đã báo cáo với trường {data.get('truong', 'nhà trường')}!")
-                        
+                        if st.button("🏫 BÁO CÁO NHÀ TRƯỜNG"):
+                            if data.get('truong'):
+                                st.success(f"Đã báo cáo với trường {data.get('truong')}!")
+                            else:
+                                st.success("Đã ghi nhận vi phạm vào hệ thống!")
+
 # ====== FOOTER ======
 st.markdown("---")
 st.markdown("""
