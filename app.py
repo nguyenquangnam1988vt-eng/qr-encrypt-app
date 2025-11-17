@@ -28,7 +28,7 @@ def decrypt_data(token: str, password: str) -> str:
 
 # ====== Hàm tạo QR code ổn định ======
 def create_stable_qr_code(data):
-    """Tạo QR code ổn định với cấu hình tối ưu"""
+    """Tạo QR code ổn định"""
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -39,12 +39,7 @@ def create_stable_qr_code(data):
     qr.make(fit=True)
     
     img = qr.make_image(fill_color="black", back_color="white")
-    
-    # Tạo buffer mới và lưu ảnh
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)  # QUAN TRỌNG: Đưa con trỏ về đầu file
-    return buf
+    return img
 
 # ====== Giao diện web ======
 st.set_page_config(page_title="Hệ Thống QR Code Quản Lý Học Sinh", page_icon="🎓", layout="wide")
@@ -213,18 +208,25 @@ with tab1:
                 "custom": encrypted_custom
             }, ensure_ascii=False)
 
-            # TẠO QR CODE - PHẦN QUAN TRỌNG ĐÃ SỬA
+            # TẠO QR CODE - CÁCH MỚI ĐÃ SỬA LỖI
+            qr_img = create_stable_qr_code(combo_data)
+            
             # Tạo buffer cho hiển thị
-            display_buf = create_stable_qr_code(combo_data)
+            display_buf = BytesIO()
+            qr_img.save(display_buf, format="PNG")
+            display_buf.seek(0)
             
             # Tạo buffer RIÊNG cho download
-            download_buf = create_stable_qr_code(combo_data)
+            download_buf = BytesIO()
+            qr_img.save(download_buf, format="PNG")
+            download_buf.seek(0)
             
             # Hiển thị kết quả
             col_success1, col_success2 = st.columns(2)
             
             with col_success1:
                 st.image(display_buf.getvalue(), caption="✅ MÃ QR ĐÃ TẠO", use_column_width=True)
+                
                 st.download_button(
                     "⬇️ TẢI MÃ QR VỀ MÁY",
                     download_buf.getvalue(), 
@@ -348,7 +350,7 @@ with tab2:
                         encrypted_combo = qr_codes[0].data.decode()
                         st.success("✅ ĐÃ ĐỌC THÀNH CÔNG MÃ QR TỪ ẢNH!")
                     else:
-                        st.warning("⚠️ KHÔNG THỂ ĐỌC MÃ QR TỰ ĐỘNG. Vui lòng nhập thủ công.")
+                        st.warning("⚠️ KHÔNG TÌM THẤY MÃ QR TRONG ẢNH. Vui lòng nhập thủ công.")
                         st.stop()
                 except ImportError:
                     st.warning("⚠️ KHÔNG THỂ ĐỌC MÃ QR TỰ ĐỘNG. Vui lòng nhập thủ công dữ liệu QR ở trên.")
