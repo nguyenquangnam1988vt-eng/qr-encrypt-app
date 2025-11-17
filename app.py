@@ -8,15 +8,6 @@ from PIL import Image
 from io import BytesIO
 import re
 
-# ====== THƯ VIỆN ĐỌC QR CODE ======
-try:
-    from pyzbar.pyzbar import decode
-    import cv2
-    import numpy as np
-    QR_READER_AVAILABLE = True
-except ImportError:
-    QR_READER_AVAILABLE = False
-
 # ====== MẬT KHẨU MẶC ĐỊNH CHO CÔNG AN ======
 DEFAULT_PASSWORD = "CA@123123"
 
@@ -34,6 +25,26 @@ def decrypt_data(token: str, password: str) -> str:
     key = generate_key(password)
     f = Fernet(key)
     return f.decrypt(token.encode()).decode()
+
+# ====== Hàm tạo QR code ổn định ======
+def create_stable_qr_code(data):
+    """Tạo QR code ổn định với cấu hình tối ưu"""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Tạo buffer mới và lưu ảnh
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)  # QUAN TRỌNG: Đưa con trỏ về đầu file
+    return buf
 
 # ====== Giao diện web ======
 st.set_page_config(page_title="Hệ Thống QR Code Quản Lý Học Sinh", page_icon="🎓", layout="wide")
@@ -97,12 +108,10 @@ with tab1:
     col_pass1, col_pass2 = st.columns(2)
     
     with col_pass1:
-        # Mật khẩu tùy chỉnh cho QR
         custom_password = st.text_input(
             "Mật khẩu tùy chỉnh *", 
             placeholder="Nhập mật khẩu để mở QR sau này",
-            type="password",
-            help="Mật khẩu này sẽ dùng để mở QR cùng với mật khẩu Công an và ngày sinh"
+            type="password"
         )
         
     with col_pass2:
@@ -116,7 +125,7 @@ with tab1:
     diachi = st.text_input("Địa chỉ", placeholder="123 Đường XYZ, Quận 1, TP.HCM")
 
     if st.button("🎯 TẠO MÃ QR", type="primary"):
-        # Kiểm tra thông tin bắt buộc theo từng loại
+        # Kiểm tra thông tin bắt buộc
         missing_fields = []
         
         if loai_doituong == "🚗 XE CÁ NHÂN HỌC SINH":
@@ -162,7 +171,6 @@ with tab1:
                     "loai_xe_chi_tiet": loai_xe,
                     "mau_xe": mau_xe
                 })
-                # Xác định ngày sinh để mở QR
                 ngaysinh_mo_qr = ngaysinh_hocsinh
                 
             elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
@@ -176,8 +184,7 @@ with tab1:
                     "sdt_chuxe": sdt_chuxe,
                     "quanhe_voihocsinh": quanhe_voihocsinh
                 })
-                # Có thể dùng cả ngày sinh học sinh hoặc chủ xe
-                ngaysinh_mo_qr = ngaysinh_hocsinh  # hoặc có thể cho chọn
+                ngaysinh_mo_qr = ngaysinh_hocsinh
                 
             else:  # XE GIA ĐÌNH
                 fields.update({
@@ -187,7 +194,6 @@ with tab1:
                     "loai_xe_chi_tiet": loai_xe,
                     "mau_xe": mau_xe
                 })
-                # Dùng ngày sinh chủ xe
                 ngaysinh_mo_qr = ngaysinh_chuxe
             
             # Loại bỏ các trường rỗng
@@ -207,19 +213,21 @@ with tab1:
                 "custom": encrypted_custom
             }, ensure_ascii=False)
 
-            # Tạo QR code
-            qr = qrcode.make(combo_data)
-            buf = BytesIO()
-            qr.save(buf, format="PNG")
+            # TẠO QR CODE - PHẦN QUAN TRỌNG ĐÃ SỬA
+            # Tạo buffer cho hiển thị
+            display_buf = create_stable_qr_code(combo_data)
+            
+            # Tạo buffer RIÊNG cho download
+            download_buf = create_stable_qr_code(combo_data)
             
             # Hiển thị kết quả
             col_success1, col_success2 = st.columns(2)
             
             with col_success1:
-                st.image(buf.getvalue(), caption="✅ MÃ QR ĐÃ TẠO", use_column_width=True)
+                st.image(display_buf.getvalue(), caption="✅ MÃ QR ĐÃ TẠO", use_column_width=True)
                 st.download_button(
                     "⬇️ TẢI MÃ QR VỀ MÁY",
-                    buf.getvalue(), 
+                    download_buf.getvalue(), 
                     f"QR_{bienso_xe.replace(' ', '_')}.png",
                     "image/png"
                 )
@@ -227,7 +235,7 @@ with tab1:
             with col_success2:
                 st.success("🎉 TẠO MÃ QR THÀNH CÔNG!")
                 
-                # Hiển thị dữ liệu QR để copy (QUAN TRỌNG)
+                # Hiển thị dữ liệu QR để copy
                 st.markdown("### 📋 DỮ LIỆU QR ĐỂ SAO CHÉP:")
                 st.code(combo_data, language="json")
                 st.info("💡 **SAO CHÉP ĐOẠN CODE TRÊN để dán vào phần giải mã**")
@@ -324,27 +332,26 @@ with tab2:
                 image = Image.open(uploaded)
                 st.image(image, caption="Ảnh đã tải lên", width=300)
                 
-                if QR_READER_AVAILABLE:
-                    try:
-                        img_array = np.array(image)
-                        if len(img_array.shape) == 3:
-                            img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-                        else:
-                            img_cv = img_array
-                            
-                        qr_codes = decode(img_cv)
-                        if qr_codes:
-                            encrypted_combo = qr_codes[0].data.decode()
-                            st.success("✅ ĐÃ ĐỌC THÀNH CÔNG MÃ QR TỪ ẢNH!")
-                        else:
-                            st.warning("⚠️ KHÔNG TÌM THẤY MÃ QR TRONG ẢNH. Vui lòng nhập thủ công dữ liệu QR.")
-                            st.stop()
-                    except Exception as e:
-                        st.error(f"❌ LỖI KHI ĐỌC MÃ QR: {str(e)}")
+                try:
+                    from pyzbar.pyzbar import decode
+                    import cv2
+                    import numpy as np
+                    
+                    img_array = np.array(image)
+                    if len(img_array.shape) == 3:
+                        img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                    else:
+                        img_cv = img_array
+                        
+                    qr_codes = decode(img_cv)
+                    if qr_codes:
+                        encrypted_combo = qr_codes[0].data.decode()
+                        st.success("✅ ĐÃ ĐỌC THÀNH CÔNG MÃ QR TỪ ẢNH!")
+                    else:
+                        st.warning("⚠️ KHÔNG THỂ ĐỌC MÃ QR TỰ ĐỘNG. Vui lòng nhập thủ công.")
                         st.stop()
-                else:
-                    st.warning("⚠️ THƯ VIỆN ĐỌC QR CHƯA ĐƯỢC CÀI ĐẶT. Vui lòng nhập thủ công dữ liệu QR.")
-                    st.info("💡 Chạy lệnh: pip install pyzbar")
+                except ImportError:
+                    st.warning("⚠️ KHÔNG THỂ ĐỌC MÃ QR TỰ ĐỘNG. Vui lòng nhập thủ công dữ liệu QR ở trên.")
                     st.stop()
                     
             except Exception as e:
