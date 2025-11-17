@@ -26,14 +26,14 @@ def decrypt_data(token: str, password: str) -> str:
     f = Fernet(key)
     return f.decrypt(token.encode()).decode()
 
-# ====== Hàm tạo QR code ổn định ======
-def create_stable_qr_code(data):
-    """Tạo QR code ổn định"""
+# ====== Hàm tạo QR code sắc nét ======
+def create_sharp_qr_code(data):
+    """Tạo QR code sắc nét, kích thước vừa phải"""
     qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
+        version=2,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,  # Sửa lỗi trung bình
+        box_size=8,    # Kích thước vừa phải
+        border=2,      # Border nhỏ nhưng đủ
     )
     qr.add_data(data)
     qr.make(fit=True)
@@ -208,24 +208,25 @@ with tab1:
                 "custom": encrypted_custom
             }, ensure_ascii=False)
 
-            # TẠO QR CODE - CÁCH MỚI ĐÃ SỬA LỖI
-            qr_img = create_stable_qr_code(combo_data)
+            # TẠO QR CODE SẮC NÉT
+            qr_img = create_sharp_qr_code(combo_data)
             
             # Tạo buffer cho hiển thị
             display_buf = BytesIO()
-            qr_img.save(display_buf, format="PNG")
+            qr_img.save(display_buf, format="PNG", optimize=True)
             display_buf.seek(0)
             
             # Tạo buffer RIÊNG cho download
             download_buf = BytesIO()
-            qr_img.save(download_buf, format="PNG")
+            qr_img.save(download_buf, format="PNG", optimize=True)
             download_buf.seek(0)
             
             # Hiển thị kết quả
             col_success1, col_success2 = st.columns(2)
             
             with col_success1:
-                st.image(display_buf.getvalue(), caption="✅ MÃ QR ĐÃ TẠO", use_column_width=True)
+                # Hiển thị QR nhỏ hơn nhưng sắc nét
+                st.image(display_buf.getvalue(), caption="✅ MÃ QR ĐÃ TẠO", width=250)
                 
                 st.download_button(
                     "⬇️ TẢI MÃ QR VỀ MÁY",
@@ -440,26 +441,6 @@ with tab2:
                             st.write(f"**Loại xe:** {data.get('loai_xe_chi_tiet', 'N/A')}")
                         if data.get('mau_xe'):
                             st.write(f"**Màu xe:** {data.get('mau_xe', 'N/A')}")
-                
-                # Chức năng cho Công an
-                if option == "👮 MẬT KHẨU CÔNG AN":
-                    st.markdown("---")
-                    st.warning("🚨 CHỨC NĂNG BÁO CÁO VI PHẠM")
-                    col_report1, col_report2 = st.columns(2)
-                    
-                    with col_report1:
-                        if st.button("📧 GỬI THÔNG BÁO"):
-                            if data.get('loai_xe') in ["🚗 XE CÁ NHÂN HỌC SINH", "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM"]:
-                                st.success(f"Đã gửi thông báo đến phụ huynh học sinh {data.get('hoten_hocsinh', '')}!")
-                            else:
-                                st.success(f"Đã gửi thông báo đến chủ xe {data.get('hoten_chuxe', '')}!")
-                    
-                    with col_report2:
-                        if st.button("🏫 BÁO CÁO NHÀ TRƯỜNG"):
-                            if data.get('truong'):
-                                st.success(f"Đã báo cáo với trường {data.get('truong')}!")
-                            else:
-                                st.success("Đã ghi nhận vi phạm vào hệ thống!")
 
 # ====== FOOTER ======
 st.markdown("---")
