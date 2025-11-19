@@ -35,6 +35,21 @@ def decrypt_data(token: str, password: str) -> str:
     f = Fernet(key)
     return f.decrypt(token.encode()).decode()
 
+# ====== Hàm tạo QR code chuẩn ======
+def create_proper_qr_code(data):
+    """Tạo QR code với cấu hình chuẩn"""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    return img
+
 # ====== Giao diện web ======
 st.set_page_config(page_title="Hệ Thống QR Code Quản Lý Học Sinh", page_icon="🎓", layout="wide")
 
@@ -97,12 +112,10 @@ with tab1:
     col_pass1, col_pass2 = st.columns(2)
     
     with col_pass1:
-        # Mật khẩu tùy chỉnh cho QR
         custom_password = st.text_input(
             "Mật khẩu tùy chỉnh *", 
             placeholder="Nhập mật khẩu để mở QR sau này",
-            type="password",
-            help="Mật khẩu này sẽ dùng để mở QR cùng với mật khẩu Công an và ngày sinh"
+            type="password"
         )
         
     with col_pass2:
@@ -116,7 +129,7 @@ with tab1:
     diachi = st.text_input("Địa chỉ", placeholder="123 Đường XYZ, Quận 1, TP.HCM")
 
     if st.button("🎯 TẠO MÃ QR", type="primary"):
-        # Kiểm tra thông tin bắt buộc theo từng loại
+        # Kiểm tra thông tin bắt buộc
         missing_fields = []
         
         if loai_doituong == "🚗 XE CÁ NHÂN HỌC SINH":
@@ -162,7 +175,6 @@ with tab1:
                     "loai_xe_chi_tiet": loai_xe,
                     "mau_xe": mau_xe
                 })
-                # Xác định ngày sinh để mở QR
                 ngaysinh_mo_qr = ngaysinh_hocsinh
                 
             elif loai_doituong == "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM":
@@ -176,8 +188,7 @@ with tab1:
                     "sdt_chuxe": sdt_chuxe,
                     "quanhe_voihocsinh": quanhe_voihocsinh
                 })
-                # Có thể dùng cả ngày sinh học sinh hoặc chủ xe
-                ngaysinh_mo_qr = ngaysinh_hocsinh  # hoặc có thể cho chọn
+                ngaysinh_mo_qr = ngaysinh_hocsinh
                 
             else:  # XE GIA ĐÌNH
                 fields.update({
@@ -187,7 +198,6 @@ with tab1:
                     "loai_xe_chi_tiet": loai_xe,
                     "mau_xe": mau_xe
                 })
-                # Dùng ngày sinh chủ xe
                 ngaysinh_mo_qr = ngaysinh_chuxe
             
             # Loại bỏ các trường rỗng
@@ -207,27 +217,50 @@ with tab1:
                 "custom": encrypted_custom
             }, ensure_ascii=False)
 
-            # Tạo QR code
-            qr = qrcode.make(combo_data)
-            buf = BytesIO()
-            qr.save(buf, format="PNG")
+            # TẠO QR CODE - CÁCH MỚI ĐÃ SỬA
+            qr_img = create_proper_qr_code(combo_data)
+            
+            # Tạo buffer RIÊNG cho hiển thị
+            display_buf = BytesIO()
+            qr_img.save(display_buf, format="PNG", optimize=True)
+            display_buf.seek(0)
+
+            # Tạo buffer RIÊNG cho download PNG
+            download_buf_png = BytesIO()
+            qr_img.save(download_buf_png, format="PNG", optimize=True)
+            download_buf_png.seek(0)
+
+            # Tạo buffer RIÊNG cho download JPG (dự phòng)
+            download_buf_jpg = BytesIO()
+            qr_img.convert('RGB').save(download_buf_jpg, format="JPEG", quality=95)
+            download_buf_jpg.seek(0)
             
             # Hiển thị kết quả
             col_success1, col_success2 = st.columns(2)
             
             with col_success1:
-                st.image(buf.getvalue(), caption="✅ MÃ QR ĐÃ TẠO", use_column_width=True)
+                st.image(display_buf.getvalue(), caption="✅ MÃ QR ĐÃ TẠO", use_column_width=True)
+                
+                # Nút download PNG
                 st.download_button(
-                    "⬇️ TẢI MÃ QR VỀ MÁY",
-                    buf.getvalue(), 
+                    "⬇️ TẢI MÃ QR (PNG)",
+                    download_buf_png.getvalue(), 
                     f"QR_{bienso_xe.replace(' ', '_')}.png",
                     "image/png"
+                )
+                
+                # Nút download JPG (dự phòng)
+                st.download_button(
+                    "⬇️ TẢI MÃ QR (JPG)",
+                    download_buf_jpg.getvalue(), 
+                    f"QR_{bienso_xe.replace(' ', '_')}.jpg",
+                    "image/jpeg"
                 )
             
             with col_success2:
                 st.success("🎉 TẠO MÃ QR THÀNH CÔNG!")
                 
-                # Hiển thị dữ liệu QR để copy (QUAN TRỌNG)
+                # Hiển thị dữ liệu QR để copy
                 st.markdown("### 📋 DỮ LIỆU QR ĐỂ SAO CHÉP:")
                 st.code(combo_data, language="json")
                 st.info("💡 **SAO CHÉP ĐOẠN CODE TRÊN để dán vào phần giải mã**")
@@ -431,26 +464,6 @@ with tab2:
                             st.write(f"**Loại xe:** {data.get('loai_xe_chi_tiet', 'N/A')}")
                         if data.get('mau_xe'):
                             st.write(f"**Màu xe:** {data.get('mau_xe', 'N/A')}")
-                
-                # Chức năng cho Công an
-                if option == "👮 MẬT KHẨU CÔNG AN":
-                    st.markdown("---")
-                    st.warning("🚨 CHỨC NĂNG BÁO CÁO VI PHẠM")
-                    col_report1, col_report2 = st.columns(2)
-                    
-                    with col_report1:
-                        if st.button("📧 GỬI THÔNG BÁO"):
-                            if data.get('loai_xe') in ["🚗 XE CÁ NHÂN HỌC SINH", "🔄 XE GIA ĐÌNH - HỌC SINH SỬ DỤNG TẠM"]:
-                                st.success(f"Đã gửi thông báo đến phụ huynh học sinh {data.get('hoten_hocsinh', '')}!")
-                            else:
-                                st.success(f"Đã gửi thông báo đến chủ xe {data.get('hoten_chuxe', '')}!")
-                    
-                    with col_report2:
-                        if st.button("🏫 BÁO CÁO NHÀ TRƯỜNG"):
-                            if data.get('truong'):
-                                st.success(f"Đã báo cáo với trường {data.get('truong')}!")
-                            else:
-                                st.success("Đã ghi nhận vi phạm vào hệ thống!")
 
 # ====== FOOTER ======
 st.markdown("---")
